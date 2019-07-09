@@ -87,20 +87,6 @@ class Presentation(object):
 
     @property
     def metadata(self):
-        def get_title(pres_div):
-            return pres_div.find('h1', class_="general").div.get_text().strip()
-
-        def get_date(pres_div):
-            strings = ''.join(pres_div.find('span', class_='author_general').strings)
-            match = re.search('on[\n ]+(.*\d{4})', strings)
-            if match:
-                return datetime.datetime.strptime(match.group(1), "%b %d, %Y")
-            else:
-                raise Exception("Failed to extract date (markup changed?)")
-
-        def get_author(pres_div):
-            return pres_div.find('span', class_='authors-list').find('a').get_text().strip()
-
         def get_timecodes(pres_div):
             for script in pres_div.find_all('script'):
                 mo = re.search("TIMES\s?=\s?new\s+Array.?\((\d+(,\d+)+)\)", script.get_text())
@@ -128,15 +114,6 @@ class Presentation(object):
                     else:
                         raise Exception("Unsupported video type: %s" % path)
 
-        def get_bio(div):
-            return div.find('p', id="biotext").get_text(strip=True)
-
-        def get_summary(div):
-            return "".join(div.find('p', id="summary").get_text("|", strip=True).split("|")[1:])
-
-        def get_about(div):
-            return div.find('p', id="conference").get_text(strip=True)
-
         def get_demo_timings(pres_div):
             for script in pres_div.find_all('script'):
                 timings = re.search("demoTimings\s+=\s+'([^']+)", script.get_text())
@@ -144,45 +121,14 @@ class Presentation(object):
                     return [int(t) for t in timings.group(1).split(',')]
             return []
 
-        def add_pdf_if_exist(metadata, pres_div):
-            # The markup is not the same if authenticated or not
-            form = pres_div.find('form', id="pdfForm")
-            if form:
-                metadata['pdf'] = client.get_url('/pdfdownload.action?filename=') + urllib.parse.quote(form.input['value'], safe='')
-            else:
-                a = pres_div.find('a', class_='link-slides')
-                if a:
-                    metadata['pdf'] = client.get_url(a['href'])
-
-        def add_mp3_if_exist(metadata, bc3):
-            # The markup is not the same if authenticated or not
-            form = bc3.find('form', id="mp3Form")
-            if form:
-                metadata['mp3'] = client.get_url('/mp3download.action?filename=') + urllib.parse.quote(form.input['value'], safe='')
-            else:
-                a = bc3.find('a', class_='link-mp3')
-                if a:
-                    metadata['mp3'] = client.get_url(a['href'])
-
         if not hasattr(self, "_metadata"):
-            pres_div = self.soup.find('div', class_='presentation_full')
             metadata = {
-                'url': client.get_url("/presentations/" + self.id),
-                'title': get_title(pres_div),
-                'date' : get_date(pres_div),
-                'auth' : get_author(pres_div),
                 'timecodes': get_timecodes(self.soup),
                 'demo_timings': get_demo_timings(self.soup),
                 'slides': get_slides(self.soup),
                 'video_url': six.u("rtmpe://video.infoq.com/cfx/st/"),
                 'video_path': get_video(self.soup),
-                'bio':        get_bio(pres_div),
-                'summary':    get_summary(pres_div),
-                'about':      get_about(pres_div),
-
                 }
-            add_mp3_if_exist(metadata, pres_div)
-            add_pdf_if_exist(metadata, pres_div)
 
             self._metadata = metadata
 
